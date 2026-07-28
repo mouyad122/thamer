@@ -1,0 +1,24 @@
+# Local demo/dev environment only. The Next.js web app itself runs outside
+# this compose file (via `npm run dev`), and talks to the scanner-worker at
+# http://localhost:8080. See README.md for the full local setup sequence.
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:v17.1.1
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
+
+  scanner-worker:
+    build:
+      context: ./scanner-worker
+    ports:
+      - "8080:8080"
+    environment:
+      SCANNER_WORKER_SECRET: ${SCANNER_WORKER_SECRET:-dev-secret-change-me}
+      # Required so the worker (and its internal ZAP baseline scan) is
+      # allowed to reach juice-shop's private Docker-network address.
+      # NEVER set this in a real/public deployment — see docs/decisions.md.
+      SCAN_ALLOW_PRIVATE_NETWORKS: "true"
+    depends_on:
+      - juice-shop
+    restart: unless-stopped

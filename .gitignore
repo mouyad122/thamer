@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+.env
+.env.local
+prisma/dev.db
+prisma/dev.db-journal
+reports/
+scanner-worker/node_modules/
+scanner-worker/dist/
+coverage/

@@ -1,0 +1,105 @@
+// Prisma schema for Web Security Scanner.
+// Default provider is SQLite for simple local development and grading demos.
+// For production on Vercel, switch provider to "postgresql" and set DATABASE_URL
+// to a managed Postgres instance (e.g. Neon) — see docs/deployment.md.
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ScanStatus {
+  PENDING
+  VALIDATING
+  SCANNING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+model Scan {
+  id             String     @id @default(cuid())
+  targetUrl      String
+  normalizedUrl  String
+  status         ScanStatus @default(PENDING)
+  currentStep    String?
+  exactScore     Float?
+  displayedScore Int?
+  rating         String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  durationMs     Int?
+  errorMessage   String?
+  // JSON-encoded string arrays of check names (Scan model has no native array
+  // type on SQLite, so these are stored as JSON strings and parsed in lib code).
+  completedChecks String @default("[]")
+  failedChecks    String @default("[]")
+  skippedChecks   String @default("[]")
+  // Structured OWASP ZAP Baseline execution outcome (see lib/types.ts
+  // ZapExecutionResult) — a real reason code/message is always recorded,
+  // never just a generic "Not Tested" with no explanation.
+  zapStatus        String    @default("NOT_TESTED")
+  zapReasonCode    String?
+  zapReasonMessage String?
+  zapStartedAt     DateTime?
+  zapCompletedAt   DateTime?
+  zapDurationMs    Int?
+  createdAt      DateTime   @default(now())
+
+  findings Finding[]
+  report   Report?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Finding {
+  id            String   @id @default(cuid())
+  scanId        String
+  ruleId        String
+  title         String
+  severity      String
+  confidence    String
+  exposure      String
+  affectedUrl   String
+  description   String
+  evidence      String?
+  // Full raw evidence (e.g. an entire CSP header) for an expandable "Raw
+  // Evidence" section — kept separate from `evidence` so descriptions never
+  // have to inline a whole policy/header value.
+  rawEvidence   String?
+  remediation   String
+  owaspCategory String?
+  cweId         String?
+  // JSON-encoded string array of source scanners, e.g. ["Custom Header Scanner","OWASP ZAP"]
+  source        String
+  fingerprint   String
+  penalty       Float
+  occurrences   Int      @default(1)
+  // "NOT_DEMONSTRATED" | "DEMONSTRATED" — whether exploitable impact was
+  // actually shown, separate from how confident the observation itself is.
+  exploitability String?
+  // "REQUIRES_MANUAL_REVIEW" when the finding could not be confirmed as a
+  // real, score-affecting issue (e.g. cookie sensitivity was inconclusive).
+  reviewStatus   String?
+  createdAt     DateTime @default(now())
+
+  scan Scan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+  @@index([fingerprint])
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  scanId      String   @unique
+  filePath    String
+  sha256      String
+  generatedAt DateTime @default(now())
+
+  scan Scan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+}
