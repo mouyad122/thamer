@@ -23,13 +23,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A valid target URL is required." }, { status: 400 });
   }
 
-  const scan = await prisma.scan.create({
-    data: {
-      targetUrl: parsed.data.url,
-      normalizedUrl: parsed.data.url,
-      status: "PENDING",
-    },
-  });
-
-  return NextResponse.json({ id: scan.id }, { status: 201 });
+  try {
+    const scan = await prisma.scan.create({
+      data: {
+        targetUrl: parsed.data.url,
+        normalizedUrl: parsed.data.url,
+        status: "PENDING",
+      },
+    });
+    return NextResponse.json({ id: scan.id }, { status: 201 });
+  } catch (error: any) {
+    console.error("Failed to create scan in DB:", error);
+    return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 });
+  }
 }
