@@ -77,7 +77,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     coverage: computeScanCoverage({ completed: completedChecks, failed: failedChecks, skipped: skippedChecks }),
     zapExecution: scanFieldsToZapExecution(scan),
     scoreBreakdown,
-    hasReport: Boolean(scan.report),
+    hasReport: scan.status === "COMPLETED" || scan.status === "PARTIAL" || scan.status === "FAILED",
     findings: findings.sort((a, b) => b.penalty - a.penalty),
   });
 }

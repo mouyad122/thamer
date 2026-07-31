@@ -3,9 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { runScan } from "@/lib/run-scan";
 import { deduplicateFindings } from "@/lib/dedup";
 import { attachPenalties, calculateSecurityScore } from "@/lib/scoring";
-import { checklistToJson, findingToCreateData, zapExecutionToScanFields, scanFieldsToZapExecution } from "@/lib/persist";
-import { generateReportPdf } from "@/lib/report";
-import type { CheckName } from "@/lib/types";
+import { checklistToJson, findingToCreateData, zapExecutionToScanFields } from "@/lib/persist";
+
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -86,36 +85,6 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       },
     }),
   ]);
-
-  try {
-    const savedScan = await prisma.scan.findUniqueOrThrow({ where: { id } });
-    const report = await generateReportPdf(
-      {
-        id: savedScan.id,
-        targetUrl: savedScan.targetUrl,
-        status: savedScan.status,
-        startedAt: savedScan.startedAt,
-        completedAt: savedScan.completedAt,
-        durationMs: savedScan.durationMs,
-        errorMessage: savedScan.errorMessage,
-        completedChecks: JSON.parse(savedScan.completedChecks) as CheckName[],
-        failedChecks: JSON.parse(savedScan.failedChecks) as CheckName[],
-        skippedChecks: JSON.parse(savedScan.skippedChecks) as CheckName[],
-        zapExecution: scanFieldsToZapExecution(savedScan),
-      },
-      scored,
-      score,
-    );
-    await prisma.report.upsert({
-      where: { scanId: id },
-      create: { scanId: id, filePath: report.filePath, sha256: report.sha256 },
-      update: { filePath: report.filePath, sha256: report.sha256, generatedAt: new Date() },
-    });
-  } catch (err) {
-    // PDF generation failing must not erase the completed scan results —
-    // the site still shows real findings; only the download button is unavailable.
-    console.error("Report generation failed for scan", id, err);
-  }
 
   return NextResponse.json({ id: scan.id, status: result.status, displayedScore: score.displayedScore });
 }

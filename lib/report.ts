@@ -1,6 +1,4 @@
-import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+
 import type { CheckName, ScoredFinding, ScoreResult, Severity, ZapExecutionResult } from "./types";
 import { STEP_LABELS } from "./step-labels";
 import { redact } from "./redact";
@@ -127,6 +125,11 @@ export function buildReportHtml(scan: ReportScanData, findings: ScoredFinding[],
   .breakdown-row { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 6px 0; }
   .breakdown-row:last-child { border-bottom: none; }
 </style>
+<script>
+  window.onload = function() {
+    window.print();
+  }
+</script>
 </head>
 <body>
   <h1>Web Security Scanner — Automated Security Scan Report</h1>
@@ -260,50 +263,3 @@ export function buildReportHtml(scan: ReportScanData, findings: ScoredFinding[],
 </html>`;
 }
 
-export interface GeneratedReport {
-  filePath: string;
-  sha256: string;
-}
-
-/**
- * Renders the report HTML to a real PDF using Playwright/Chromium and writes
- * it to REPORTS_DIR, returning the file path and a SHA-256 integrity hash of
- * the PDF bytes (stored alongside the Report record).
- */
-export async function generateReportPdf(
-  scan: ReportScanData,
-  findings: ScoredFinding[],
-  score: ScoreResult,
-): Promise<GeneratedReport> {
-  const html = buildReportHtml(scan, findings, score);
-
-  // Lazy import so environments without Playwright installed (e.g. a pure
-  // API-only deployment) don't fail at module load time, only when a report
-  // is actually requested.
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle" });
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      displayHeaderFooter: true,
-      headerTemplate: "<span></span>",
-      footerTemplate:
-        '<div style="font-size:9px;width:100%;text-align:center;color:#888;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>',
-      margin: { top: "20mm", bottom: "16mm", left: "15mm", right: "15mm" },
-    });
-
-    const reportsDir = path.resolve(process.env.REPORTS_DIR ?? "./reports");
-    await mkdir(reportsDir, { recursive: true });
-    const fileName = `${scan.id}.pdf`;
-    const filePath = path.join(reportsDir, fileName);
-    await writeFile(filePath, pdfBuffer);
-
-    const sha256 = createHash("sha256").update(pdfBuffer).digest("hex");
-    return { filePath, sha256 };
-  } finally {
-    await browser.close();
-  }
-}
