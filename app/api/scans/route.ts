@@ -32,8 +32,9 @@ export async function POST(request: Request) {
       },
     });
     return NextResponse.json({ id: scan.id }, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to create scan in DB:", error);
-    return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: `Database error: ${message}` }, { status: 500 });
   }
 }
